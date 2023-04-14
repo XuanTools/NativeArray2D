@@ -252,11 +252,30 @@ namespace Unity.Collections
                     UnsafeUtility.MemClear(m_Buffer[i], (long)SizeY[i] * UnsafeUtility.SizeOf<T>());
         }
 
+        public unsafe NativeArray2D(int[] size, Allocator allocator, NativeArrayOptions options = NativeArrayOptions.ClearMemory)
+        {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (size == null)
+                throw new ArgumentNullException("array");
+#endif
+            var SizeY = (int*)UnsafeUtility.Malloc(UnsafeUtility.SizeOf<int>() * size.Length, UnsafeUtility.AlignOf<int>(), allocator); ;
+            for (int i = 0; i < size.Length; i++)
+            {
+                SizeY[i] = size[i];
+            }
+            Allocate(size.Length, SizeY, allocator, out this);
+
+            if ((options & NativeArrayOptions.ClearMemory) == NativeArrayOptions.ClearMemory)
+                for (int i = 0; i < SizeX; i++)
+                    UnsafeUtility.MemClear(m_Buffer[i], (long)SizeY[i] * UnsafeUtility.SizeOf<T>());
+        }
+
         public NativeArray2D(T[][] array2D, Allocator allocator)
         {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (array2D == null)
                 throw new ArgumentNullException("array");
-
+#endif
             var SizeY = (int*)UnsafeUtility.Malloc(UnsafeUtility.SizeOf<int>() * array2D.Length, UnsafeUtility.AlignOf<int>(), allocator);
             for (int i = 0; i < array2D.Length; i++)
             {
@@ -264,6 +283,21 @@ namespace Unity.Collections
             }
 
             Allocate(array2D.Length, SizeY, allocator, out this);
+            Copy(array2D, this);
+        }
+
+        public NativeArray2D(NativeArray2D<T> array2D, Allocator allocator)
+        {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            AtomicSafetyHandle.CheckReadAndThrow(array2D.m_Safety);
+#endif
+            var SizeY = (int*)UnsafeUtility.Malloc(UnsafeUtility.SizeOf<int>() * array2D.SizeX, UnsafeUtility.AlignOf<int>(), allocator);
+            for (int i = 0; i < array2D.SizeX; i++)
+            {
+                SizeY[i] = array2D[i].Length;
+            }
+
+            Allocate(array2D.SizeX, SizeY, allocator, out this);
             Copy(array2D, this);
         }
 
