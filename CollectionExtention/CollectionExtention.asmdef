@@ -1,7 +1,9 @@
 {
     "name": "CollectionsExtention",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "Unity.Burst"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": true,

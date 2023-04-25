@@ -1,10 +1,8 @@
 /****************************************************
-    * License: MIT
-    * Name: NativeArray2D.cs
-    * Author: LuoxuanLove
-    * Function: 
-    *     A native container of 2D array (Jagged)
-    *     Can be used similarly as NativeArray
+ * Copyright (c) 2023 XuanTools MIT License
+ *  
+ * NativeArray2D.cs
+ * A native container of 2D array (Jagged)
 *****************************************************/
 
 using System;
@@ -12,11 +10,14 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Unity.Burst;
+using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using UnityEngine.Internal;
+using XuanTools.CollectionsExtension.LowLevel.Unsafe;
 
-namespace Unity.Collections
+namespace XuanTools.CollectionsExtension
 {
     [NativeContainer]
     [NativeContainerSupportsMinMaxWriteRestriction]
@@ -313,7 +314,7 @@ namespace Unity.Collections
             array2D.m_SizeX = sizeX;
             array2D.m_SizeY = sizeY;
             array2D.m_AllocatorLabel = allocator;
-            array2D.m_Buffer = (void**)UnsafeUtility.Malloc(sizeof(void*) * sizeX, sizeof(void*), allocator);
+            array2D.m_Buffer = (void**)UnsafeUtility.Malloc(UnsafeHelper.SizeOfPointer() * sizeX, UnsafeHelper.AlignOfPointer(), allocator);
             for (int i = 0; i < sizeX; i++)
             {
                 array2D.m_Buffer[i] = UnsafeUtility.Malloc(UnsafeUtility.SizeOf<T>() * sizeY[i], UnsafeUtility.AlignOf<T>(), allocator);
@@ -666,6 +667,7 @@ namespace Unity.Collections
         }
     }
 
+    [BurstCompile]
     internal struct NativeCustomArray2DDisposeJob : IJob
     {
         internal NativeCustomArray2DDispose Data;
