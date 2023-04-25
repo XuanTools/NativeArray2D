@@ -467,8 +467,6 @@ namespace Unity.Collections
             return array2D;
         }
 
-        internal int[] ArrayZero => new int[SizeX];
-
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         private static void CheckCopyLengths(int srcLength, int dstLength)
         {
@@ -485,7 +483,8 @@ namespace Unity.Collections
                 CheckCopyLengths(src.SizeY[i], dst.SizeY[i]);
             }
 #endif
-            Copy(src, dst.ArrayZero, dst, dst.ArrayZero, dst.SizeY);
+            int[] arrayZero = new int[dst.SizeX];
+            Copy(src, arrayZero, dst, arrayZero, dst.SizeY);
         }
 
         public static void Copy(T[][] src, NativeArray2D<T> dst)
@@ -497,7 +496,8 @@ namespace Unity.Collections
                 CheckCopyLengths(src[i].Length, dst.SizeY[i]);
             }
 #endif
-            Copy(src, dst.ArrayZero, dst, dst.ArrayZero, dst.SizeY);
+            int[] arrayZero = new int[dst.SizeX];
+            Copy(src, arrayZero, dst, arrayZero, dst.SizeY);
         }
 
         public static void Copy(NativeArray2D<T> src, T[][] dst)
@@ -509,22 +509,26 @@ namespace Unity.Collections
                 CheckCopyLengths(src.SizeY[i], dst[i].Length);
             }
 #endif
-            Copy(src, src.ArrayZero, dst, src.ArrayZero, src.SizeY);
+            int[] arrayZero = new int[src.SizeX];
+            Copy(src, arrayZero, dst, arrayZero, src.SizeY);
         }
 
         public static void Copy(NativeArray2D<T> src, NativeArray2D<T> dst, int* length)
         {
-            Copy(src, dst.ArrayZero, dst, dst.ArrayZero, length);
+            int[] arrayZero = new int[dst.SizeX];
+            Copy(src, arrayZero, dst, arrayZero, length);
         }
 
         public static void Copy(T[][] src, NativeArray2D<T> dst, int* length)
         {
-            Copy(src, dst.ArrayZero, dst, dst.ArrayZero, length);
+            int[] arrayZero = new int[dst.SizeX];
+            Copy(src, arrayZero, dst, arrayZero, length);
         }
 
         public static void Copy(NativeArray2D<T> src, T[][] dst, int* length)
         {
-            Copy(src, src.ArrayZero, dst, src.ArrayZero, length);
+            int[] arrayZero = new int[src.SizeX];
+            Copy(src, arrayZero, dst, arrayZero, length);
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
@@ -635,7 +639,7 @@ namespace Unity.Collections
                 return false;
             for (int i = 0; i < m_SizeX; i++)
             {
-                if (m_Buffer[i] != other.m_Buffer[i] || m_SizeY[i] != other.m_SizeY[i]) 
+                if (m_Buffer[i] != other.m_Buffer[i] || m_SizeY[i] != other.m_SizeY[i])
                     return false;
             }
             return true;
