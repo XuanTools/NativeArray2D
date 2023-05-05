@@ -9,7 +9,7 @@ using System.Runtime.CompilerServices;
 
 namespace XuanTools.CollectionsExtension.LowLevel.Unsafe
 {
-    public unsafe class UnsafeHelper
+    public class UnsafeHelper
     {
         private unsafe struct AlignOfPointerHelper
         {

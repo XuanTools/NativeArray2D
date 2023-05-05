@@ -9,6 +9,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Unity.Burst;
 using Unity.Collections;
@@ -24,7 +25,7 @@ namespace XuanTools.CollectionsExtension
     [NativeContainerSupportsDeallocateOnJobCompletion]
     [DebuggerDisplay("SizeX = {SizeX}")]
     [StructLayout(LayoutKind.Sequential)]
-    public unsafe struct NativeArray2D<T> : IDisposable, IEnumerable<NativeArray2D<T>.ReadOnlyNativeArray>, IEnumerable, IEquatable<NativeArray2D<T>> where T : struct
+    public struct NativeArray2D<T> : IDisposable, IEnumerable<NativeArray2D<T>.ReadOnlyNativeArray>, IEnumerable, IEquatable<NativeArray2D<T>> where T : struct
     {
         [ExcludeFromDocs]
         public struct Enumerator : IEnumerator<ReadOnlyNativeArray>, IEnumerator, IDisposable
@@ -63,7 +64,7 @@ namespace XuanTools.CollectionsExtension
         [NativeContainer]
         [NativeContainerIsReadOnly]
         [DebuggerDisplay("Length = {Length}")]
-        public unsafe struct ReadOnlyNativeArray : IEnumerable<T>, IEnumerable
+        public struct ReadOnlyNativeArray : IEnumerable<T>, IEnumerable
         {
             [ExcludeFromDocs]
             public struct Enumerator : IEnumerator<T>, IEnumerator, IDisposable
@@ -111,7 +112,7 @@ namespace XuanTools.CollectionsExtension
 
             public int Length => m_Length;
 
-            public T this[int index]
+            public unsafe T this[int index]
             {
                 get
                 {
@@ -271,7 +272,7 @@ namespace XuanTools.CollectionsExtension
                     UnsafeUtility.MemClear(m_Buffer[i], (long)SizeY[i] * UnsafeUtility.SizeOf<T>());
         }
 
-        public NativeArray2D(T[][] array2D, Allocator allocator)
+        public unsafe NativeArray2D(T[][] array2D, Allocator allocator)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (array2D == null)
@@ -287,7 +288,7 @@ namespace XuanTools.CollectionsExtension
             Copy(array2D, this);
         }
 
-        public NativeArray2D(NativeArray2D<T> array2D, Allocator allocator)
+        public unsafe NativeArray2D(NativeArray2D<T> array2D, Allocator allocator)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckReadAndThrow(array2D.m_Safety);
@@ -332,10 +333,10 @@ namespace XuanTools.CollectionsExtension
 
         public int GetSizeX() => m_SizeX;
 
-        public int GetSizeY(int X) => m_SizeY[X];
+        public unsafe int GetSizeY(int X) => m_SizeY[X];
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        private static void CheckAllocateArguments(int sizeX, int* sizeY, Allocator allocator)
+        private unsafe static void CheckAllocateArguments(int sizeX, int* sizeY, Allocator allocator)
         {
             if (allocator <= Allocator.None)
                 throw new ArgumentException("Allocator must be Temp, TempJob or Persistent", nameof(allocator));
@@ -355,13 +356,20 @@ namespace XuanTools.CollectionsExtension
                     throw new ArgumentOutOfRangeException(nameof(sizeY), $"Length * sizeof(T) cannot exceed {int.MaxValue} bytes");
             }
 
-            if (!UnsafeUtility.IsBlittable<T>())
-                throw new ArgumentException(string.Format("{0} used in NativeCustomArray<{0}> must be blittable", typeof(T)));
-
-            if (!UnsafeUtility.IsValidNativeContainerElementType<T>())
-                throw new InvalidOperationException($"{typeof(T)} used in NativeCustomArray<{typeof(T)}> must be unmanaged (contain no managed types) and cannot itself be a native container type.");
+            IsUnmanagedAndThrow();
         }
 
+        [BurstDiscard]
+        internal static void IsUnmanagedAndThrow()
+        {
+            if (!UnsafeUtility.IsBlittable<T>())
+                throw new ArgumentException($"{typeof(T)} used in NativeArray2D<{typeof(T)}> must be blittable");
+
+            if (!UnsafeUtility.IsValidNativeContainerElementType<T>())
+                throw new InvalidOperationException($"{typeof(T)} used in NativeArray<{typeof(T)}> must be unmanaged (contain no managed types) and cannot itself be a native container type.");
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         private void CheckRangeAccess(int index)
         {
@@ -381,6 +389,28 @@ namespace XuanTools.CollectionsExtension
                 throw new IndexOutOfRangeException(string.Format("Index {0} is out of range of '{1}' Length.", index, SizeX));
             }
 #endif
+        }
+
+        [WriteAccessRequired]
+        public unsafe void Dispose()
+        {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (!UnsafeUtility.IsValidAllocator(m_AllocatorLabel))
+                throw new InvalidOperationException("The NativeArray can not be Disposed because it was not allocated with a valid allocator.");
+
+            DisposeSentinel.Dispose(ref m_Safety, ref m_DisposeSentinel);
+#endif
+
+            // 释放分配的内存并重置变量。
+            for (int i = 0; i < m_SizeX; i++)
+            {
+                UnsafeUtility.Free(m_Buffer[i], m_AllocatorLabel);
+            }
+            UnsafeUtility.Free(m_Buffer, m_AllocatorLabel);
+            UnsafeUtility.Free(m_SizeY, m_AllocatorLabel);
+            m_Buffer = null;
+            m_SizeX = 0;
+            m_SizeY = null;
         }
 
         public unsafe JobHandle Dispose(JobHandle inputDeps)
@@ -414,27 +444,6 @@ namespace XuanTools.CollectionsExtension
             return result;
         }
 
-        public void Dispose()
-        {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!UnsafeUtility.IsValidAllocator(m_AllocatorLabel))
-                throw new InvalidOperationException("The NativeArray can not be Disposed because it was not allocated with a valid allocator.");
-
-            DisposeSentinel.Dispose(ref m_Safety, ref m_DisposeSentinel);
-#endif
-
-            // 释放分配的内存并重置变量。
-            for (int i = 0; i < m_SizeX; i++)
-            {
-                UnsafeUtility.Free(m_Buffer[i], m_AllocatorLabel);
-            }
-            UnsafeUtility.Free(m_Buffer, m_AllocatorLabel);
-            UnsafeUtility.Free(m_SizeY, m_AllocatorLabel);
-            m_Buffer = null;
-            m_SizeX = 0;
-            m_SizeY = null;
-        }
-
         [WriteAccessRequired]
         public void CopyFrom(T[][] array2D)
         {
@@ -457,7 +466,7 @@ namespace XuanTools.CollectionsExtension
             Copy(this, array2D);
         }
 
-        public T[][] ToArray2D()
+        public unsafe T[][] ToArray2D()
         {
             T[][] array2D = new T[m_SizeX][];
             for (int i = 0; i < m_SizeX; i++)
@@ -475,7 +484,7 @@ namespace XuanTools.CollectionsExtension
                 throw new ArgumentException("source and destination length must be the same");
         }
 
-        public static void Copy(NativeArray2D<T> src, NativeArray2D<T> dst)
+        public unsafe static void Copy(NativeArray2D<T> src, NativeArray2D<T> dst)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(dst.m_Safety);
@@ -488,7 +497,7 @@ namespace XuanTools.CollectionsExtension
             Copy(src, arrayZero, dst, arrayZero, dst.SizeY);
         }
 
-        public static void Copy(T[][] src, NativeArray2D<T> dst)
+        public unsafe static void Copy(T[][] src, NativeArray2D<T> dst)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(dst.m_Safety);
@@ -501,7 +510,7 @@ namespace XuanTools.CollectionsExtension
             Copy(src, arrayZero, dst, arrayZero, dst.SizeY);
         }
 
-        public static void Copy(NativeArray2D<T> src, T[][] dst)
+        public unsafe static void Copy(NativeArray2D<T> src, T[][] dst)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckReadAndThrow(src.m_Safety);
@@ -514,19 +523,19 @@ namespace XuanTools.CollectionsExtension
             Copy(src, arrayZero, dst, arrayZero, src.SizeY);
         }
 
-        public static void Copy(NativeArray2D<T> src, NativeArray2D<T> dst, int* length)
+        public unsafe static void Copy(NativeArray2D<T> src, NativeArray2D<T> dst, int* length)
         {
             int[] arrayZero = new int[dst.SizeX];
             Copy(src, arrayZero, dst, arrayZero, length);
         }
 
-        public static void Copy(T[][] src, NativeArray2D<T> dst, int* length)
+        public unsafe static void Copy(T[][] src, NativeArray2D<T> dst, int* length)
         {
             int[] arrayZero = new int[dst.SizeX];
             Copy(src, arrayZero, dst, arrayZero, length);
         }
 
-        public static void Copy(NativeArray2D<T> src, T[][] dst, int* length)
+        public unsafe static void Copy(NativeArray2D<T> src, T[][] dst, int* length)
         {
             int[] arrayZero = new int[src.SizeX];
             Copy(src, arrayZero, dst, arrayZero, length);
@@ -634,7 +643,7 @@ namespace XuanTools.CollectionsExtension
             return GetEnumerator();
         }
 
-        public bool Equals(NativeArray2D<T> other)
+        public unsafe bool Equals(NativeArray2D<T> other)
         {
             if (m_Buffer != other.m_Buffer || m_SizeX != other.m_SizeX)
                 return false;
@@ -648,15 +657,15 @@ namespace XuanTools.CollectionsExtension
     }
 
     [NativeContainer]
-    internal unsafe struct NativeCustomArray2DDispose
+    internal struct NativeCustomArray2DDispose
     {
         // 放松指针的安全性，以便Job可以用这个结构来安排。
-        [NativeDisableUnsafePtrRestriction] internal void** m_Buffer;
-        [NativeDisableUnsafePtrRestriction] internal void* m_SizeY;
+        [NativeDisableUnsafePtrRestriction] internal unsafe void** m_Buffer;
+        [NativeDisableUnsafePtrRestriction] internal unsafe void* m_SizeY;
         internal int m_SizeX;
         internal Allocator m_AllocatorLabel;
 
-        public void Dispose()
+        public unsafe void Dispose()
         {
             // 释放分配的内存
             for (int i = 0; i < m_SizeX; i++)
