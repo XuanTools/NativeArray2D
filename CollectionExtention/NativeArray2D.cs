@@ -316,9 +316,12 @@ namespace XuanTools.CollectionsExtension
             array2D.m_SizeY = sizeY;
             array2D.m_AllocatorLabel = allocator;
             array2D.m_Buffer = (void**)UnsafeUtility.Malloc(UnsafeHelper.SizeOfPointer() * sizeX, UnsafeHelper.AlignOfPointer(), allocator);
+
+            int sizeOfT = UnsafeUtility.SizeOf<T>();
+            int alignOfT = UnsafeUtility.AlignOf<T>();
             for (int i = 0; i < sizeX; i++)
             {
-                array2D.m_Buffer[i] = UnsafeUtility.Malloc(UnsafeUtility.SizeOf<T>() * sizeY[i], UnsafeUtility.AlignOf<T>(), allocator);
+                array2D.m_Buffer[i] = UnsafeUtility.Malloc(sizeOfT * sizeY[i], alignOfT, allocator);
             }
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -577,10 +580,13 @@ namespace XuanTools.CollectionsExtension
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 CheckCopyArguments(src[i].Length, srcIndex[i], dst.SizeY[i], dstIndex[i], length[i]);
 #endif
-                GCHandle gCHandle = GCHandle.Alloc(src[i], GCHandleType.Pinned);
-                IntPtr intPtr = gCHandle.AddrOfPinnedObject();
-                UnsafeUtility.MemCpy((byte*)dst.m_Buffer[i] + dstIndex[i] * UnsafeUtility.SizeOf<T>(), (byte*)(void*)intPtr + srcIndex[i] * UnsafeUtility.SizeOf<T>(), length[i] * UnsafeUtility.SizeOf<T>());
-                gCHandle.Free();
+                if (src[i].Length > 0)
+                {
+                    GCHandle gCHandle = GCHandle.Alloc(src[i], GCHandleType.Pinned);
+                    IntPtr intPtr = gCHandle.AddrOfPinnedObject();
+                    UnsafeUtility.MemCpy((byte*)dst.m_Buffer[i] + dstIndex[i] * UnsafeUtility.SizeOf<T>(), (byte*)(void*)intPtr + srcIndex[i] * UnsafeUtility.SizeOf<T>(), length[i] * UnsafeUtility.SizeOf<T>());
+                    gCHandle.Free();
+                }
             }
         }
 
@@ -599,10 +605,13 @@ namespace XuanTools.CollectionsExtension
                     throw new ArgumentNullException($"src[{i}]");
                 CheckCopyArguments(src[i].Length, srcIndex[i], dst.SizeY[i], dstIndex[i], length[i]);
 #endif
-                GCHandle gCHandle = GCHandle.Alloc(src[i], GCHandleType.Pinned);
-                IntPtr intPtr = gCHandle.AddrOfPinnedObject();
-                UnsafeUtility.MemCpy((byte*)dst.m_Buffer[i] + dstIndex[i] * UnsafeUtility.SizeOf<T>(), (byte*)(void*)intPtr + srcIndex[i] * UnsafeUtility.SizeOf<T>(), length[i] * UnsafeUtility.SizeOf<T>());
-                gCHandle.Free();
+                if (src[i].Length > 0)
+                {
+                    GCHandle gCHandle = GCHandle.Alloc(src[i], GCHandleType.Pinned);
+                    IntPtr intPtr = gCHandle.AddrOfPinnedObject();
+                    UnsafeUtility.MemCpy((byte*)dst.m_Buffer[i] + dstIndex[i] * UnsafeUtility.SizeOf<T>(), (byte*)(void*)intPtr + srcIndex[i] * UnsafeUtility.SizeOf<T>(), length[i] * UnsafeUtility.SizeOf<T>());
+                    gCHandle.Free();
+                }
             }
         }
 
@@ -621,10 +630,13 @@ namespace XuanTools.CollectionsExtension
                     throw new ArgumentNullException($"dst[{i}]");
                 CheckCopyArguments(src.SizeY[i], srcIndex[i], dst[i].Length, dstIndex[i], length[i]);
 #endif
-                GCHandle gCHandle = GCHandle.Alloc(dst[i], GCHandleType.Pinned);
-                IntPtr intPtr = gCHandle.AddrOfPinnedObject();
-                UnsafeUtility.MemCpy((byte*)(void*)intPtr + dstIndex[i] * UnsafeUtility.SizeOf<T>(), (byte*)src.m_Buffer[i] + srcIndex[i] * UnsafeUtility.SizeOf<T>(), length[i] * UnsafeUtility.SizeOf<T>());
-                gCHandle.Free();
+                if (src[i].Length > 0)
+                {
+                    GCHandle gCHandle = GCHandle.Alloc(dst[i], GCHandleType.Pinned);
+                    IntPtr intPtr = gCHandle.AddrOfPinnedObject();
+                    UnsafeUtility.MemCpy((byte*)(void*)intPtr + dstIndex[i] * UnsafeUtility.SizeOf<T>(), (byte*)src.m_Buffer[i] + srcIndex[i] * UnsafeUtility.SizeOf<T>(), length[i] * UnsafeUtility.SizeOf<T>());
+                    gCHandle.Free();
+                }
             }
         }
 
